@@ -1,109 +1,101 @@
+import json
 from telethon import TelegramClient
-from telethon import types,utils
-from telethon.tl.functions.messages import SendMessageRequest
+from telethon import types,utils,functions
 import asyncio
-from sanic import Sanic
-from sanic import response,request,html
-from User import User
-from sanic_session import Session,InMemorySessionInterface
-from jinja2 import Environment,FileSystemLoader
-import sys
-app = Sanic("tele")
-CurrentUser = None
-IDAndHash = {}
-LastSend = []
-@app.route('/index')
-async def index(request):
-    global CurrentUser
-    if CurrentUser!= None:
-        return response.redirect('/dialog')
-    return response.html("<form action = \"/login \" method = \"post\"   >\
-            api_id:  \
-                <input name = \"id\" type = \"text\">\
-            api_hash:\
-                <input name = \"hash\" type = \"text\">\
-                <input type = \"submit\">\
-            </form>")
-@app.route('/login',methods=['POST'])
-async def login(request):
-    global IDAndHash,CurrentUser
-    if CurrentUser != None:
-        return response.redirect('/dialog')
-    id = request.form.get("id")
-    hash = request.form.get("hash")
-    if id == None or hash == None:
-        return response.redirect('/index')
-    IDAndHash.clear()
-    IDAndHash[id] = hash
-    return response.redirect('/dialog')
-@app.route('/login',methods=['GET'])
-async def login_get(request):
-    return response.redirect('/index')
-
-@app.route('/dialog')
-async def dialog(request):
-    global IDAndHash,CurrentUser
-    if CurrentUser == None:
-        if len(IDAndHash) == 0:
-            return response.redirect('/index')
-        user = None
-        for key in IDAndHash.keys():
-            user = User(key,IDAndHash[key])
-        client = await TelegramClient(user.getAPI_ID()+user.getAPI_Hash(),user.getAPI_ID(),user.getAPI_Hash()).start()
-        user.setClient(client)
-        CurrentUser = user
-    result = []
-    async for dialog in CurrentUser.getClient().iter_dialogs():
+import argparse
+import re
+from telethon.tl.functions.messages import ImportChatInviteRequest
+Source=[]
+Des=[]
+FoundChannel=set()
+SourceEntityList = []
+DesEntityList = []
+API_ID=None
+API_HASH=None
+async def Forward():
+    readMsgIds = []
+    client = await TelegramClient('anonymous',API_ID,API_HASH).start()
+    pattern1 = re.compile(r'https://t.me/[a-z0-9@#%&*()_+-={}\[\]\\|<>,./?]+',re.I)
+    pattern2 = re.compile(r'https://t.me/[a-zA-Z][\w\d]{3,30}[a-zA-Z\d]',re.I)
+    async for dialog in client.iter_dialogs():
+        entity = dialog.entity
+        if entity.id in Source:
+            SourceEntityList.append(entity)
+        if entity.id in Des:
+            DesEntityList.append(entity)
+    while True:
+        for entity in SourceEntityList:
+            msg = await client.get_messages(entity)
+            if msg[0].id not in readMsgIds or len(DesEntityList) > 0:
+                for item in DesEntityList:
+                    print(item.title)
+                    #await client.forward_messages(item.id,msg[0].id,entity.id)
+                    nameSet = []
+                    async for mes1 in client.iter_messages(item):      
+                        if mes1.message  is not None and pattern2.search(mes1.message)  is not None:  
+                            try:
+                                name = pattern2.search(mes1.message).group(0)
+                                if name  not in nameSet:
+                                    nameSet.append(name)
+                                    temp_entity = await client.get_entity(name)
+                                    if isinstance(temp_entity,types.Channel) and temp_entity.megagroup == True:
+                                        result = await client(functions.channels.JoinChannelRequest(channel=name))
+                                    if isinstance(temp_entity,types.Chat):
+                                        result = await client(functions.channels.JoinChannelRequest(channel=name))
+                                    DesEntityList.append(temp_entity)
+                            except Exception as e:
+                                print(e)
+                                continue
+                    DesEntityList.remove(item)
+                readMsgIds.append(msg[0].id)
+        await asyncio.sleep(10)
+async def PrintIDS():
+    client = await TelegramClient('anonymous',API_ID,API_HASH).start()
+    result = ""
+    async for dialog in client.iter_dialogs():
         entity = dialog.entity
         if isinstance(entity,types.Channel):
-            temp = {}
-            temp['id'] = entity.id
-            temp['title'] = entity.title
-            temp_channel = await CurrentUser.client.get_entity(entity)
-            if temp_channel.broadcast == True:
-                temp['canSend'] = False
-            if temp_channel.megagroup == True:
-                temp['canSend'] = True
-            if temp_channel.gigagroup == True:
-                temp['canSend'] = True
-            result.append(temp)
+            temp_channel = await client.get_entity(entity)
+            if temp_channel.megagroup == True or temp_channel.gigagroup == True:
+                result +="Channel(megagroup/gigagroup): " + str(entity.id) + " title: " + entity.title + "\n"
+            else:
+                result +="Channel: " + str(entity.id) + " title: " + entity.title + "\n"
         if isinstance(entity,types.Chat):
-            temp = {}
-            temp['id'] = entity.id
-            temp['title'] = entity.title
-            temp['canSend'] = True
-            result.append(temp)
+            result += "Group: " + str(entity.id) + " title: " + entity.title + "\n"
         if isinstance(entity,types.User):
-            temp = {}
-            temp['id'] = entity.id
-            temp['title'] = entity.first_name
-            temp['canSend'] = True
-            result.append(temp)
-    file_loader = FileSystemLoader('templates')
-    env = Environment(loader = file_loader)
-    template = env.get_template('checkDialog.html')
-    template_content = template.render(Conlist=result,last=LastSend)
-    LastSend.clear()
-    return html(template_content)
-@app.route('/logout')
-async def logout(request):
-    global CurrentUser
-    if CurrentUser is not None:
-        del CurrentUser.client
-        CurrentUser = None
-    return response.redirect('/index')
-@app.route('/sendMsg',methods=['POST'])
-async def sendMsg(request):
-    global CurrentUser
-    if CurrentUser == None:
-        return response.redirect('/index')
-    msgText = request.form.get('msg')
-    for item in request.form:
-        if item != 'msg':
-            LastSend.append(int(item))
-            item = 0-int(item)
-            readid,peertype = utils.resolve_id(item)
-            await CurrentUser.client.send_message(readid,request.form.get('msg'))
-    return response.redirect('/dialog')
+            result += "User: " + str(entity.id) + " name: " + entity.first_name + "\n"
+    with open("./IDS","w") as out:
+        out.write(result)
 if __name__ == "__main__":
-    app.run(host = '0.0.0.0',port = 7778)
+    config_data = None
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p","--printIDS",help="显示id")
+    parser.add_argument("-c","--config",help="使用配置文件")
+    args = parser.parse_args()
+    with open('./config.json','r+') as  config:
+            data = ''
+            for line in config:
+                data += line.replace('\n','')
+            config_data = json.loads(data)
+    if args.printIDS == "file":
+        if 'API_ID' in config_data:
+            API_ID = config_data['API_ID']
+        if 'API_HASH' in config_data:
+            API_HASH = config_data['API_HASH']
+        asyncio.run(PrintIDS())
+    if args.config == 'config':
+        if 'source' in config_data:
+            Source.extend(config_data['source'])
+            print(Source)
+        if "destination" in config_data:
+            Des.extend(config_data['destination'])
+            print(Des)
+        if 'API_ID' in config_data:
+            API_ID = config_data['API_ID']
+        if 'API_HASH' in config_data:
+            API_HASH = config_data['API_HASH']
+        if len(Source) == 0:
+            print('please set source')
+        if API_HASH == None or API_ID == None:
+            print('please set API_HASH OR API_ID')
+        asyncio.run(Forward())
