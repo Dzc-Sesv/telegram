@@ -1,12 +1,14 @@
 from telethon import TelegramClient,types,utils,functions,events
 import json
 import asyncio
+from GroupSpider import GroupSpider
 class Bot:
     def __init__(self):
         self.API_ID = ''
         self.API_HASH = ''
         self.client = None
         self.messagefilter = None
+        self.group_spider = None
         config_data = None
         with open('./config.json','r+') as  config:
             data = ''
@@ -46,8 +48,23 @@ class Bot:
         self.messagefilter.Bot = self
     async def startListen(self):
         await self.login()
+        print('start forwarding')
         @self.client.on(events.NewMessage)
         async def notify(event):
-            await self.messagefilter.notify(event)
+            try:
+                await self.messagefilter.notify(event)
+            except Exception as e:
+                print(e)
+        @self.client.on(events.ChatAction)
+        async def join(event):
+            if event.user_joined:
+                if isinstance(event.action_message.peer_id,types.PeerChannel):
+                    me = await self.client.get_me()
+                    if event.action_message.from_id.user_id == me.id:
+                        self.messagefilter.addDes(event.action_message.peer_id.channel_id)
+        group_spider = GroupSpider(self)
+        self.group_spider = group_spider
+        group_spider.addNodes(self.messagefilter.des_id)
         while True:
-            await asyncio.sleep(100)
+            await group_spider.extractUrl()
+            

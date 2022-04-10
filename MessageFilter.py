@@ -1,4 +1,5 @@
 import json
+import re
 from telethon import types
 class MessageFilter:
     def __init__(self):
@@ -29,6 +30,12 @@ class MessageFilter:
         if id in self.source_id:
             for des_id in self.des_id:
                 await self.Bot.client.forward_messages(des_id,event.message.id,id)
+        if id in self.des_id:
+            pattern  = re.compile(r'https://t.me/[a-zA-Z][\w\d]{3,30}[a-zA-Z\d]',re.I)
+            msg = event.message.message
+            if pattern.search(msg) is not None:
+                print(pattern.search(msg).group(0))
+                self.Bot.group_spider.addUrl(pattern.search(msg).group(0))
     def addSource(self,id):
         if id not in self.source_id:
             self.source_id.add(id)

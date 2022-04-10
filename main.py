@@ -67,7 +67,7 @@ if __name__ == "__main__":
     
     message_filter = MessageFilter()
     if args.printIDS is None:
-        if message_filter.isLegal() and bot.isLegal():
+        if bot.isLegal() and message_filter.isLegal():
             bot.addMessageFilter(message_filter)
             asyncio.run(bot.startListen())
         sys.exit(0)
