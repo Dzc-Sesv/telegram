@@ -55,7 +55,7 @@ class Bot:
                 await self.messagefilter.notify(event)
             except Exception as e:
                 print(e)
-        @self.client.on(events.ChatAction)
+        #@self.client.on(events.ChatAction)
         async def join(event):
             if event.user_joined:
                 if isinstance(event.action_message.peer_id,types.PeerChannel):
