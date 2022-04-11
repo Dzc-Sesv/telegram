@@ -1,11 +1,13 @@
 import json
-import re
-from telethon import types
-class MessageFilter:
-    def __init__(self):
+from telethon import types,events
+from Plugin import Plugin
+import asyncio
+class MessageForward(Plugin):
+    def __init__(self,client):
+        super().__init__(client)
         self.source_id = set()
         self.des_id = set()
-        self.Bot = None
+        self.message_queue = {}
         config_data = None
         with open('./config.json','r+') as  config:
             data = ''
@@ -18,6 +20,25 @@ class MessageFilter:
         if "destination" in config_data:
             for item in config_data['destination']:
                 self.addDes(int(item))
+    def Register(self):
+        super().Register()
+        @self.client.on(events.NewMessage)
+        async def handle1(event):
+            await self.notify(event)
+        @self.client.on(events.ChatAction)
+        async def handle2(event):
+            await self.replay(event)
+    async def replay(self,event):
+        if event.user_joined:
+            joinedChannelId = event.action_message.peer_id.channel_id
+            userId = event.action_message.from_id.user_id
+            me = await self.client.get_me()
+            myId = me.id
+            print(str(userId)+":"+str(myId))
+            if userId == myId:
+                for item in self.message_queue.values():
+                    await self.client.forward_messages(joinedChannelId,item.id,myId)
+                self.addDes(joinedChannelId)
     async def notify(self,event):
         peerid = event.message.peer_id
         id = 0
@@ -29,13 +50,8 @@ class MessageFilter:
             id = peerid.channel_id
         if id in self.source_id:
             for des_id in self.des_id:
-                await self.Bot.client.forward_messages(des_id,event.message.id,id)
-        if id in self.des_id:
-            pattern  = re.compile(r'https://t.me/[a-zA-Z][\w\d]{3,30}[a-zA-Z\d]',re.I)
-            msg = event.message.message
-            if pattern.search(msg) is not None:
-                print(pattern.search(msg).group(0))
-                self.Bot.group_spider.addUrl(pattern.search(msg).group(0))
+                await self.client.forward_messages(des_id,event.message.id,id)
+            self.message_queue[event.message.message] = event.message
     def addSource(self,id):
         if id not in self.source_id:
             self.source_id.add(id)
@@ -47,3 +63,5 @@ class MessageFilter:
             print('please set source and des in config.json')
             return False
         return True
+    async def run(self):
+        pass

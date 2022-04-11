@@ -1,12 +1,14 @@
-from telethon import TelegramClient,types,utils,functions,events
+from telethon import TelegramClient,types
 import json
 import asyncio
 from GroupSpider import GroupSpider
+import sys
 class Bot:
     def __init__(self):
         self.API_ID = ''
         self.API_HASH = ''
         self.client = None
+        self.plugins = []
         self.messagefilter = None
         self.group_spider = None
         config_data = None
@@ -43,28 +45,20 @@ class Bot:
             if isinstance(entity,types.User):
                 result += "User: " + str(entity.id) + " name: " + entity.first_name + "\n"
         return result
-    def addMessageFilter(self,filter):
-        self.messagefilter = filter
-        self.messagefilter.Bot = self
-    async def startListen(self):
-        await self.login()
-        print('start forwarding')
-        @self.client.on(events.NewMessage)
-        async def notify(event):
-            try:
-                await self.messagefilter.notify(event)
-            except Exception as e:
-                print(e)
-        #@self.client.on(events.ChatAction)
-        async def join(event):
-            if event.user_joined:
-                if isinstance(event.action_message.peer_id,types.PeerChannel):
-                    me = await self.client.get_me()
-                    if event.action_message.from_id.user_id == me.id:
-                        self.messagefilter.addDes(event.action_message.peer_id.channel_id)
-        group_spider = GroupSpider(self)
-        self.group_spider = group_spider
-        group_spider.addNodes(self.messagefilter.des_id)
-        while True:
-            await group_spider.extractUrl()
-            
+    def addPlugin(self,plugin):
+        if plugin.isLegal():
+            self.plugins.append(plugin)
+        else:
+            sys.exit(0)
+    
+    async def run(self):
+        if self.isLegal():
+            await self.login()
+            tasks = []
+            for plugin in self.plugins:
+                plugin.Register()
+                tasks.append(plugin.run())
+            await asyncio.wait(tasks)
+            print('1')
+        else:
+            sys.exit(0)

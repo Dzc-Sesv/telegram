@@ -1,13 +1,9 @@
-from telethon import TelegramClient
-from telethon import types,utils,functions
 import asyncio
 import argparse
-import re
 import sys
 from  Bot import Bot
-from MessageFilter import MessageFilter
-from telethon.tl.functions.messages import ImportChatInviteRequest
-
+from MessageForward import MessageForward
+from GroupSpider import GroupSpider
 async def PrintIDS(bot,filename):
     await bot.login()
     idsData = await bot.getIDS()
@@ -25,9 +21,11 @@ if __name__ == "__main__":
             asyncio.run(PrintIDS(bot,args.printIDS))
         sys.exit(0)
     
-    message_filter = MessageFilter()
+    
     if args.printIDS is None:
-        if bot.isLegal() and message_filter.isLegal():
-            bot.addMessageFilter(message_filter)
-            asyncio.run(bot.startListen())
-        sys.exit(0)
+        message_filter = MessageForward(bot) #消息转发插件
+        bot.addPlugin(message_filter)
+
+        group_spider = GroupSpider(bot)
+        bot.addPlugin(group_spider)
+        asyncio.run(bot.run())
