@@ -1,7 +1,6 @@
 import json
-from telethon import types,events
+from telethon import types,events,functions
 from Plugin import Plugin
-import asyncio
 class MessageForward(Plugin):
     def __init__(self,client):
         super().__init__(client)
@@ -29,6 +28,7 @@ class MessageForward(Plugin):
         async def handle2(event):
             await self.replay(event)
     async def replay(self,event):
+        print(event)
         if event.user_joined:
             joinedChannelId = event.action_message.peer_id.channel_id
             userId = event.action_message.from_id.user_id
@@ -38,7 +38,8 @@ class MessageForward(Plugin):
             if userId == myId:
                 for item in self.message_queue.values():
                     await self.client.forward_messages(joinedChannelId,item.id,myId)
-                self.addDes(joinedChannelId)
+                entity = await self.client.get_entity(joinedChannelId)
+                await self.client(functions.channels.LeaveChannelRequest(entity))
     async def notify(self,event):
         peerid = event.message.peer_id
         id = 0

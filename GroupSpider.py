@@ -40,7 +40,6 @@ class GroupSpider(Plugin):
                         result = pattern.search(message.message)
                         if result is not None and result.group(0) not in self.GroupUrl:
                             name = result.group(0)
-                            print(name)
                             self.GroupUrl.add(name)
                             try:
                                 url_entity = await self.client.get_entity(name)
@@ -49,6 +48,7 @@ class GroupSpider(Plugin):
                                     join_result = await self.client(functions.channels.JoinChannelRequest(channel=name))
                                 if isinstance(url_entity,types.Chat):
                                     join_result = await self.client(functions.channels.JoinChannelRequest(channel=name))
+                                asyncio.sleep(10)
                             except Exception as e:
                                 print('catch the exception:')
                                 print(e)
