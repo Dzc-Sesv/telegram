@@ -1,3 +1,4 @@
+from this import d
 from telethon import TelegramClient,types
 import json
 import asyncio
@@ -11,6 +12,9 @@ class Bot:
         self.plugins = []
         self.messagefilter = None
         self.group_spider = None
+        self.singal = []
+        self.singalmap = {}
+        self.msgqueue = {}
         config_data = None
         with open('./config.json','r+') as  config:
             data = ''
@@ -21,6 +25,13 @@ class Bot:
             self.API_ID = config_data['API_ID']
         if 'API_HASH' in config_data:
             self.API_HASH = config_data['API_HASH']
+    def registerSingalMap(self,Singal:str,handle):
+        self.singalmap[Singal] = handle
+    def addSingal(self,Singal,msg):
+        print('addSingal')
+        self.singal.append(Singal)
+        self.msgqueue[len(self.msgqueue)] = msg
+        print(self.singal)
     def isLegal(self):
         if self.API_ID == '' or self.API_HASH == '':
             print('please set api_id and api_hash in config.json')
@@ -50,7 +61,16 @@ class Bot:
             self.plugins.append(plugin)
         else:
             sys.exit(0)
-    
+    async def process(self):
+        while True:
+            if len(self.singal) > 0:
+                for index,singal in enumerate(self.singal):
+                    if singal in self.singalmap.keys():
+                        await self.singalmap[singal](self.msgqueue[index])
+                    continue
+                self.singal.clear()
+                self.msgqueue.clear()
+            await asyncio.sleep(1)
     async def run(self):
         if self.isLegal():
             await self.login()
@@ -58,6 +78,7 @@ class Bot:
             for plugin in self.plugins:
                 plugin.Register()
                 tasks.append(plugin.run())
+            tasks.append(self.process())
             await asyncio.wait(tasks)
             print('1')
         else:

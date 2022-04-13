@@ -1,3 +1,4 @@
+from ntpath import join
 import re
 import json
 from telethon import types,functions
@@ -32,27 +33,36 @@ class GroupSpider(Plugin):
         self.GroupUrl.add(url)
     async def extractUrlAndJoin(self):
         pattern  = re.compile(r'https://t.me/[a-zA-Z][\w\d]{3,30}[a-zA-Z\d]',re.I)
-        while True:
-            for node in self.nodes:
-                node_entity = await self.client.get_entity(node)
-                async for message in self.client.iter_messages(node_entity):
+        for node in self.nodes:
+            try:
+                #node_entity = await self.client.get_entity(node)
+                async for message in self.client.iter_messages(node):
                     if isinstance(message.message,str):
                         result = pattern.search(message.message)
                         if result is not None and result.group(0) not in self.GroupUrl:
                             name = result.group(0)
+                            print(name)
                             self.GroupUrl.add(name)
-                            try:
-                                url_entity = await self.client.get_entity(name)
-                                join_result = None
-                                if isinstance(url_entity,types.Channel) and url_entity.megagroup == True:
-                                    join_result = await self.client(functions.channels.JoinChannelRequest(channel=name))
-                                if isinstance(url_entity,types.Chat):
-                                    join_result = await self.client(functions.channels.JoinChannelRequest(channel=name))
-                                asyncio.sleep(10)
-                            except Exception as e:
-                                print('catch the exception:')
-                                print(e)
-                                continue
+                            url_entity = await self.client.get_entity(name)
+                            join_result = None
+                            if isinstance(url_entity,types.Channel) and url_entity.megagroup == True:
+                                join_result = await self.client(functions.channels.JoinChannelRequest(channel=name))
+                                join_result = await self.client(functions.channels.JoinChannelRequest(channel=name))
+                                join_result = await self.client(functions.channels.JoinChannelRequest(channel=name))
+                                self.addNode(url_entity.id)
+                                self.bot.addSingal('Joined',url_entity.id)
+                                await asyncio.sleep(10)
+                            if isinstance(url_entity,types.Chat):
+                                join_result = await self.client(functions.channels.JoinChannelRequest(channel=name))
+                                join_result = await self.client(functions.channels.JoinChannelRequest(channel=name))
+                                join_result = await self.client(functions.channels.JoinChannelRequest(channel=name))
+
+                                self.bot.addSingal('Joined',1)
+                                await asyncio.sleep(10)
+            except Exception as e:
+                print('catch the exception:')
+                print(e)
+                continue
     async def sleep(self):
         print('GroupSpider sleep')
         await asyncio.sleep(10)

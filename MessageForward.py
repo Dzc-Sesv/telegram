@@ -21,25 +21,31 @@ class MessageForward(Plugin):
                 self.addDes(int(item))
     def Register(self):
         super().Register()
+        
+        self.bot.registerSingalMap('Joined',self.replay)
+
         @self.client.on(events.NewMessage)
         async def handle1(event):
             await self.notify(event)
-        @self.client.on(events.ChatAction)
-        async def handle2(event):
-            await self.replay(event)
-    async def replay(self,event):
-        print(event)
-        if event.user_joined:
-            joinedChannelId = event.action_message.peer_id.channel_id
-            userId = event.action_message.from_id.user_id
-            me = await self.client.get_me()
-            myId = me.id
-            print(str(userId)+":"+str(myId))
-            if userId == myId:
-                for item in self.message_queue.values():
-                    await self.client.forward_messages(joinedChannelId,item.id,myId)
-                entity = await self.client.get_entity(joinedChannelId)
-                await self.client(functions.channels.LeaveChannelRequest(entity))
+    async def replay(self,msg):
+        print(msg)
+        me = await self.client.get_me()
+        myId = me.id
+        for item in self.message_queue.values():
+            await self.client.forward_messages(msg,item.id,myId)
+        if msg not in self.des_id:
+            await self.client(functions.channels.LeaveChannelRequest(msg))
+        # if event.user_joined:
+            # joinedChannelId = event.action_message.peer_id.channel_id
+            # userId = event.action_message.from_id.user_id
+            # # me = await self.client.get_me()
+            # myId = me.id
+            # print(str(userId)+":"+str(myId))
+            # if userId == myId:
+            #     for item in self.message_queue.values():
+            #         await self.client.forward_messages(joinedChannelId,item.id,myId)
+            #     entity = await self.client.get_entity(joinedChannelId)
+            #     await self.client(functions.channels.LeaveChannelRequest(entity))
     async def notify(self,event):
         peerid = event.message.peer_id
         id = 0
