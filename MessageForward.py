@@ -28,13 +28,15 @@ class MessageForward(Plugin):
         async def handle1(event):
             await self.notify(event)
     async def replay(self,msg):
-        print(msg)
-        me = await self.client.get_me()
-        myId = me.id
-        for item in self.message_queue.values():
-            await self.client.forward_messages(msg,item.id,myId)
-        if msg not in self.des_id:
-            await self.client(functions.channels.LeaveChannelRequest(msg))
+        try:
+            me = await self.client.get_me()
+            myId = me.id
+            for item in self.message_queue.values():
+                await self.client.forward_messages(msg,item.id,myId)
+            if msg not in self.des_id:
+                await self.client(functions.channels.LeaveChannelRequest(msg))
+        except Exception as e:
+            print(e)
         # if event.user_joined:
             # joinedChannelId = event.action_message.peer_id.channel_id
             # userId = event.action_message.from_id.user_id
@@ -47,18 +49,21 @@ class MessageForward(Plugin):
             #     entity = await self.client.get_entity(joinedChannelId)
             #     await self.client(functions.channels.LeaveChannelRequest(entity))
     async def notify(self,event):
-        peerid = event.message.peer_id
-        id = 0
-        if isinstance(peerid,types.PeerUser):
-            id = peerid.user_id
-        elif isinstance(peerid,types.PeerChat):
-            id = peerid.chat_id
-        elif isinstance(peerid,types.PeerChannel):
-            id = peerid.channel_id
-        if id in self.source_id:
-            for des_id in self.des_id:
-                await self.client.forward_messages(des_id,event.message.id,id)
-            self.message_queue[event.message.message] = event.message
+        try:
+            peerid = event.message.peer_id
+            id = 0
+            if isinstance(peerid,types.PeerUser):
+                id = peerid.user_id
+            elif isinstance(peerid,types.PeerChat):
+                id = peerid.chat_id
+            elif isinstance(peerid,types.PeerChannel):
+                id = peerid.channel_id
+            if id in self.source_id:
+                for des_id in self.des_id:
+                    await self.client.forward_messages(des_id,event.message.id,id)
+                self.message_queue[event.message.message] = event.message
+        except Exception as e:
+            print(e)
     def addSource(self,id):
         if id not in self.source_id:
             self.source_id.add(id)
